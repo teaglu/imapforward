@@ -1,3 +1,8 @@
+/****************************************************************************
+ * Copyright (c) 2022 Teaglu, LLC
+ * All Rights Reserved
+ ****************************************************************************/
+
 package com.teaglu.imapforward.job;
 
 import org.eclipse.jdt.annotation.NonNull;
