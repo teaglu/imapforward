@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import org.eclipse.jdt.annotation.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.teaglu.composite.Composite;
 import com.teaglu.composite.exception.SchemaException;
@@ -24,6 +26,8 @@ import com.teaglu.imapforward.alert.AlertSinkFactory;
 import com.teaglu.imapforward.alert.ConsoleAlertSink;
 import com.teaglu.imapforward.job.Job;
 import com.teaglu.imapforward.job.JobFactory;
+import com.teaglu.imapforward.timeout.TimeoutManager;
+import com.teaglu.imapforward.timeout.TimeoutManagerImpl;
 
 /**
  * Main
@@ -32,7 +36,14 @@ import com.teaglu.imapforward.job.JobFactory;
  *
  */
 public class Main {
-	public static void main(String[] args) {
+	private static final String VERSION= "1.1.0";
+	
+	private static final Logger log= LoggerFactory.getLogger(Main.class);
+	
+	public static void main(String[] args) {		
+		log.info("IMAPForward Version " + VERSION + " Starting");
+		
+		TimeoutManager timeoutManager= TimeoutManagerImpl.Create();
 		List<@NonNull Job> jobList= new ArrayList<>();
 		
 		{
@@ -57,11 +68,15 @@ public class Main {
 						// Otherwise just use the console
 						alertSink= ConsoleAlertSink.Create();
 					}
+
 					
 					// Build the jobs
 					Iterable<@NonNull Composite> jobSpecs= config.getRequiredObjectArray("jobs");
 					for (Composite jobSpec : jobSpecs) {
-						jobList.add(JobFactory.Create(jobSpec, alertSink));
+						boolean enabled= jobSpec.getOptionalBoolean("enabled", true);
+						if (enabled) {
+							jobList.add(JobFactory.Create(jobSpec, alertSink, timeoutManager));
+						}
 					}
 				}
 			} catch (SchemaException se) {
@@ -84,6 +99,9 @@ public class Main {
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			stopLatch.countDown();
 		}));
+		
+		// Start timeout manager
+		timeoutManager.start();
 
 		// Start all the jobs
 		for (Job job : jobList) {
@@ -96,6 +114,9 @@ public class Main {
 		} catch (InterruptedException e) {
 		}
 
+		// Stop the timeout manager first so timeouts are triggered
+		timeoutManager.stop();
+		
 		// Stop everything gracefully
 		for (Job job : jobList) {
 			job.stop();

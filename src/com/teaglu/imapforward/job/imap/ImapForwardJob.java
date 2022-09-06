@@ -13,22 +13,28 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import javax.mail.Address;
-import javax.mail.Flags;
-import javax.mail.Folder;
-import javax.mail.FolderNotFoundException;
-import javax.mail.Message;
-import javax.mail.MessagingException;
-import javax.mail.Session;
-import javax.mail.Store;
 
 import org.eclipse.jdt.annotation.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.sun.mail.imap.IMAPFolder;
 import com.teaglu.composite.Composite;
 import com.teaglu.composite.exception.SchemaException;
 import com.teaglu.imapforward.alert.AlertSink;
 import com.teaglu.imapforward.alert.PrefixAlertSink;
 import com.teaglu.imapforward.job.Job;
+import com.teaglu.imapforward.timeout.Timeout;
+import com.teaglu.imapforward.timeout.TimeoutManager;
+
+import jakarta.mail.Address;
+import jakarta.mail.Flags;
+import jakarta.mail.Folder;
+import jakarta.mail.FolderNotFoundException;
+import jakarta.mail.Message;
+import jakarta.mail.MessagingException;
+import jakarta.mail.Session;
+import jakarta.mail.Store;
 
 /**
  * ImapForwardJob
@@ -36,15 +42,22 @@ import com.teaglu.imapforward.job.Job;
  * A job that replicates messages from one mailbox to another
  */
 public class ImapForwardJob implements Job {
-	private @NonNull AlertSink alertSink;
+	private static final Logger log= LoggerFactory.getLogger(ImapForwardJob.class);
 	
-	private @NonNull String name;
+	private final @NonNull AlertSink alertSink;
+	
+	private final @NonNull String name;
+	
+	private final boolean imapDebug;
 
 	// The normal amount of time we wait to cycle
 	private int cycleSeconds= 20;
 	
 	// Fall back to slower cycle time on error so we don't spam the alert sink
 	private int errorCycleSeconds= 3600;
+
+	private final @NonNull TimeoutManager timeoutManager;
+	private long timeoutMilliseconds= 60_000;
 	
 	private static class Mailbox {
 		private @NonNull String host;
@@ -79,10 +92,14 @@ public class ImapForwardJob implements Job {
 	
 	private ImapForwardJob(
 			@NonNull Composite spec,
-			@NonNull AlertSink alertSink) throws SchemaException
+			@NonNull AlertSink alertSink,
+			@NonNull TimeoutManager timeoutManager) throws SchemaException
 	{
 		this.name= spec.getRequiredString("name");
 		this.alertSink= PrefixAlertSink.Create(alertSink, "[" + name + "] ");
+		this.timeoutManager= timeoutManager;
+		
+		this.imapDebug= spec.getOptionalBoolean("debug", false);
 		
 		Integer cycleSpec= spec.getOptionalInteger("seconds");
 		if (cycleSpec != null) {
@@ -100,9 +117,10 @@ public class ImapForwardJob implements Job {
 	
 	public static @NonNull Job Create(
 			@NonNull Composite spec,
-			@NonNull AlertSink alertSink) throws SchemaException
+			@NonNull AlertSink alertSink,
+			@NonNull TimeoutManager timeoutManager) throws SchemaException
 	{
-		return new ImapForwardJob(spec, alertSink);
+		return new ImapForwardJob(spec, alertSink, timeoutManager);
 	}
 	
 	private @NonNull IMAPFolder openFolder(
@@ -151,8 +169,16 @@ public class ImapForwardJob implements Job {
 	private Condition runWake= runLock.newCondition();
 	
 	private void runLoop() {
+		log.info("Thread for job " + name + " is running");
+		
 		Properties props= System.getProperties();
 		props.setProperty("mail.store.protocol", "imaps");
+		
+		if (imapDebug) {
+			// This dumps out all the IMAP commands on the console if we need to track anything
+			// down or see what it's doing.
+			props.setProperty("mail.debug", "true");
+		}
 		
 		Session sourceSession= Session.getInstance(props);
 		Session destinationSession= Session.getInstance(props);
@@ -167,6 +193,18 @@ public class ImapForwardJob implements Job {
 			// much longer to prevent spamming the alert sink.  Getting the same fail message
 			// every 10 seconds sucks.
 			int waitSeconds= cycleSeconds;
+			
+			// Schedule a timeout to detect thread hangs
+			//
+			// For some reason there's this one specific message in Lotus Notes where the IMAP
+			// state gets screwed up and the fetch thread just sits there doing nothing.  99:1
+			// it's an implementation bug in notes, but I'm having to hit a version 8.x server
+			// that can't be updated for "reasons".
+			//
+			// This at least keeps us from going catatonic.
+			Timeout timeout= timeoutManager.schedule(
+					System.currentTimeMillis() + timeoutMilliseconds,
+					() -> { timeoutFired(); });
 			
 			try {
 				// Connect the stores if they aren't already connected
@@ -270,6 +308,9 @@ public class ImapForwardJob implements Job {
 				
 				// Wait longer so we don't spam the alert sink
 				waitSeconds= errorCycleSeconds;
+			} finally {
+				// Cancel the timeout if it hasn't already fired
+				timeout.cancel();
 			}
 
 			// This just waits for the timeout or a wake-up signal
@@ -307,10 +348,12 @@ public class ImapForwardJob implements Job {
 				}
 			}
 		}
+		
+		log.info("Thread for job " + name + " is shut down");
 	}
 	
 	private Thread thread= null;
-	
+
 	@Override
 	public void start() {
 		runLock.lock();
@@ -338,6 +381,8 @@ public class ImapForwardJob implements Job {
 				throw new RuntimeException("Attempt to stop stopped thread");
 			}
 			
+			thread.interrupt();
+			
 			run= false;
 			runWake.signal();
 			waitThread= thread;
@@ -350,5 +395,26 @@ public class ImapForwardJob implements Job {
 			waitThread.join(60_000);
 		} catch (InterruptedException e) {
 		}
+	}
+	
+	private void timeoutFired() {
+		alertSink.sendAlert(
+				"Detected thread hang - attempting auto-restart", null);
+		
+		log.warn("Attempting emergency stop of thread due to hang");
+		stop();
+		
+		// Wait the error time before restarting the thread - this keeps from spamming
+		// somebody's inbox with the same error every ten seconds.
+		log.info("Thread stop was successful - waiting to retry");
+		try {
+			Thread.sleep(errorCycleSeconds * 1000);
+		} catch (InterruptedException e) {
+		}
+
+		log.info("Attempting auto-restart of thread");
+		start();
+		
+		alertSink.sendAlert("Auto-restart was successful", null);
 	}
 }

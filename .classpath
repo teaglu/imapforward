@@ -16,11 +16,6 @@
 			<attribute name="module" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="C:/Teaglu/java/libs/javax.mail-1.6.2.jar">
-		<attributes>
-			<attribute name="module" value="true"/>
-		</attributes>
-	</classpathentry>
 	<classpathentry kind="lib" path="C:/Teaglu/java/libs/gson-2.8.6.jar">
 		<attributes>
 			<attribute name="module" value="true"/>
@@ -36,7 +31,12 @@
 			<attribute name="module" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="C:/Teaglu/java/libs/activation-1.1.1.jar">
+	<classpathentry kind="lib" path="C:/Teaglu/java/libs/jakarta.mail-2.0.1.jar">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Teaglu/java/libs/jakarta.activation-2.0.1.jar">
 		<attributes>
 			<attribute name="module" value="true"/>
 		</attributes>

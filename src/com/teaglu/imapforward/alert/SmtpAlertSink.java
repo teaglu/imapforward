@@ -10,19 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
-import javax.mail.Authenticator;
-import javax.mail.Message.RecipientType;
-import javax.mail.MessagingException;
-import javax.mail.Multipart;
-import javax.mail.PasswordAuthentication;
-import javax.mail.Session;
-import javax.mail.Transport;
-import javax.mail.internet.AddressException;
-import javax.mail.internet.InternetAddress;
-import javax.mail.internet.MimeBodyPart;
-import javax.mail.internet.MimeMessage;
-import javax.mail.internet.MimeMultipart;
-
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 import org.slf4j.Logger;
@@ -32,6 +19,19 @@ import com.teaglu.composite.Composite;
 import com.teaglu.composite.exception.FormatException;
 import com.teaglu.composite.exception.MissingValueException;
 import com.teaglu.composite.exception.SchemaException;
+
+import jakarta.mail.Authenticator;
+import jakarta.mail.MessagingException;
+import jakarta.mail.Multipart;
+import jakarta.mail.PasswordAuthentication;
+import jakarta.mail.Session;
+import jakarta.mail.Transport;
+import jakarta.mail.internet.AddressException;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeBodyPart;
+import jakarta.mail.internet.MimeMessage;
+import jakarta.mail.internet.MimeMessage.RecipientType;
+import jakarta.mail.internet.MimeMultipart;
 
 /**
  * SmtpAlertSink
@@ -126,12 +126,12 @@ public class SmtpAlertSink implements AlertSink {
 			Session session= null;
 			
 			if ((username != null) && (password != null)) {
-				session= javax.mail.Session.getInstance(
+				session= Session.getInstance(
 						props, new PasswordAuthenticator(username, password));
 				
 				props.setProperty("mail.smtp.auth", "true");
 			} else {
-				session= javax.mail.Session.getInstance(props);
+				session= Session.getInstance(props);
 			}
 		
 			MimeMessage mail= new MimeMessage(session);
