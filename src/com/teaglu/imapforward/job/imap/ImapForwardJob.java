@@ -18,7 +18,6 @@ import org.eclipse.jdt.annotation.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.sun.mail.imap.IMAPFolder;
 import com.teaglu.composite.Composite;
 import com.teaglu.composite.exception.SchemaException;
 import com.teaglu.imapforward.alert.AlertSink;
@@ -123,7 +122,7 @@ public class ImapForwardJob implements Job {
 		return new ImapForwardJob(spec, alertSink, timeoutManager);
 	}
 	
-	private @NonNull IMAPFolder openFolder(
+	private @NonNull Folder openFolder(
 			@NonNull Store store,
 			@NonNull String name) throws MessagingException
 	{
@@ -135,13 +134,9 @@ public class ImapForwardJob implements Job {
 				folder= folder.getFolder(parts[partNo]);
 			}
 			
-			if (!(folder instanceof IMAPFolder)) {
-				throw new RuntimeException("Folder is not implemented as IMAPFolder");
-			}
-			
 			folder.open(Folder.READ_WRITE);
 			
-			return (IMAPFolder)folder;
+			return folder;
 		} catch (FolderNotFoundException e) {
 			System.err.println(
 					"Unable to open the folder " + name + " - be sure path " +
@@ -157,8 +152,14 @@ public class ImapForwardJob implements Job {
 	// preferable because it keeps message IDs, but it blows up with a "can't move between
 	// different stores" kind of message.  COPYMESSAGE seems to work so that's what I'm using
 	// now -  I haven't looked to see if the message ID changes.
+	//
+	// 20220907 - removed MOVEMESSAGE, it doesn't work between accounts.  The driver was that
+	// after converting to maven I can't get access to IMAPFolder under com.sun.  I'd like to
+	// keep working with IMAPFolders to have access to the the moveMessage call, so that we
+	// could add an option to move messages after processing instead of deleting.  I guess I'll
+	// loop back to that later, converting to maven has caused N problems.
+	
 	private enum Method {
-		MOVEMESSAGE,
 		COPYMESSAGE,
 		ADDMESSAGE
 	}
@@ -218,8 +219,8 @@ public class ImapForwardJob implements Job {
 				}
 
 				for (FolderPair pair : pairs) {
-					IMAPFolder sourceFolder= null;
-					IMAPFolder destinationFolder= null;
+					Folder sourceFolder= null;
+					Folder destinationFolder= null;
 
 					try {
 						sourceFolder= openFolder(sourceStore, pair.source);
@@ -255,17 +256,13 @@ public class ImapForwardJob implements Job {
 								
 								try {
 									switch (method) {
-									case MOVEMESSAGE:
-										sourceFolder.moveMessages(single, destinationFolder);
-										break;
-										
 									case COPYMESSAGE:
 										sourceFolder.copyMessages(single, destinationFolder);
 										message.setFlag(Flags.Flag.DELETED, true);
 										break;
 										
 									case ADDMESSAGE:
-										destinationFolder.addMessages(single);
+										destinationFolder.appendMessages(single);
 										message.setFlag(Flags.Flag.DELETED, true);
 										break;
 									}
