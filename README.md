@@ -5,12 +5,16 @@
 This is a small utility to forward mail from one email account to another using IMAP instead of
 a forward in the email service itself.  This keeps the to and from addresses the same, and gets
 around the destination service marking everything spam because it doesn't come from the original
-sender.
+sender.  Forwarding emails this way is logically equivalent to adding both accounts to 
+Thunderbird and dragging the emails from one account to the other as soon as they come in.
 
-Since the connections are made over IMAP/S this is a secure way to forward email if the original
-message was inside an organization.  This is common when you have clients that want you to have
-an email box on their system and send secure information in that email system, but it's not
-practical to monitor all those emails.
+To perform the forwarding this utility has to run as a service, since it continuously checks the
+email on the source system looking for new emails.  To the email services it appears to be a
+normal mail program, although the headers might make it obvious that it isn't.
+
+Since the emails retain the source address, when you respond to the emails the reply will come
+from your primary account not the account it originally came in for.  This is normally what you
+want so that people start using your main email address.
 
 ## Alerts
 
@@ -62,7 +66,17 @@ The following example shows all the options.
         ]
     }
 
+## Running the Program
+
+If you compile this with "mvn package" it will create an executable JAR file under the target
+directory named "com.teaglu.imapforward-$VERSION-jar-with-dependencies.jar".  You can use execute
+this at a command line with the command "java -jar $FILENAME.jar".  For a permanent solution you
+would normally set it up as a Linux service or build it into a docker container.
+
+This program is compiled against Java 11 so it should work with any JDK version 11 or above.  On
+Linux the openjdk11-jre package should work fine.
+
 ## To-Do
 
-The later versions of javax.mail have support for modern authentication, and sooner or later
+The later versions of javax.mail have support for "modern authentication", and sooner or later
 someone is going to need that.
