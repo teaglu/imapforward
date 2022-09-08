@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.teaglu</groupId>
   <artifactId>com.teaglu.imapforward</artifactId>
-  <version>1.1.0</version>
+  <version>1.1.1</version>
   <name>imapforward</name>
   <description>IMAP-Based Email Forwarder</description>
   
