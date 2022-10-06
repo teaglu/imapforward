@@ -59,6 +59,7 @@ public class ImapForwardJob implements Job {
 	private final @NonNull String name;
 	
 	private final boolean imapDebug;
+	private final boolean imapPartialFetch;
 
 	// The normal amount of time we wait to cycle
 	private int cycleSeconds= 20;
@@ -110,6 +111,7 @@ public class ImapForwardJob implements Job {
 		this.timeoutManager= timeoutManager;
 		
 		this.imapDebug= spec.getOptionalBoolean("debug", false);
+		this.imapPartialFetch= spec.getOptionalBoolean("partialFetch", true);
 		
 		Integer cycleSpec= spec.getOptionalInteger("seconds");
 		if (cycleSpec != null) {
@@ -190,6 +192,15 @@ public class ImapForwardJob implements Job {
 			// This dumps out all the IMAP commands on the console if we need to track anything
 			// down or see what it's doing.
 			props.setProperty("mail.debug", "true");
+		}
+		
+		// Set a 1M append buffer, or else IMAP store will buffer the entire message
+		props.setProperty("mail.imaps.appendbuffersize", "1048576");
+		
+		if (!imapPartialFetch) {
+			// This is a weird kluge because older Lotus Notes servers don't properly implement
+			// partial fetch, and it makes the thread hang.  Disabling partial fetch fixes that.
+			props.setProperty("mail.imaps.partialfetch", "false");
 		}
 		
 		Session sourceSession= Session.getInstance(props);

@@ -47,7 +47,7 @@ import com.teaglu.imapforward.timeout.TimeoutManagerImpl;
  *
  */
 public class Main {
-	private static final String VERSION= "1.1.2";
+	private static final String VERSION= "1.1.3";
 	
 	private static final Logger log= LoggerFactory.getLogger(Main.class);
 	
