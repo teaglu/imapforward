@@ -20,4 +20,5 @@ module com.teaglu.imapforward {
 
 	requires jakarta.mail;
 	requires org.slf4j;
+	requires com.teaglu.configure;
 }

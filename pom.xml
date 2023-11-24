@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.teaglu</groupId>
 	<artifactId>com.teaglu.imapforward</artifactId>
-	<version>1.1.3</version>
+	<version>1.2.0</version>
 	<name>imapforward</name>
 	<description>IMAP-Based Email Forwarder</description>
 
@@ -59,6 +59,12 @@
 				</executions>
 			</plugin>
 		</plugins>
+		<resources>
+			<resource>
+				<directory>src/com/teaglu/imapforward/resources</directory>
+				<filtering>true</filtering>
+			</resource>
+		</resources>
 	</build>
 
 	<dependencies>
@@ -95,7 +101,12 @@
 		<dependency>
 			<groupId>com.teaglu</groupId>
 			<artifactId>com.teaglu.composite</artifactId>
-			<version>[1.0.0,2.0.0)</version>
+			<version>[1.1.6,2.0.0)</version>
+		</dependency>
+		<dependency>
+			<groupId>com.teaglu</groupId>
+			<artifactId>com.teaglu.configure</artifactId>
+			<version>[1.2.2,2.0.0)</version>
 		</dependency>
 	</dependencies>
 </project>
